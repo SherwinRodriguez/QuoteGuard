@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
+
+const navItems =[
+    {name:"Home",href:"/"},
+    {name:"Dashboard",href:"/dashboard"},
+    {name:"Login",href:"/login"},
+    {name:"Verify",href:"/verify"},
+]
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -16,6 +24,7 @@ export default function RootLayout({
       <body
         className={`antialiased`}
       >
+        <Navbar navItems={navItems}/>
         {children}
       </body>
     </html>
