@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
+import { AuthProvider } from "@/context/AuthContext";
 
 const navItems =[
     {name:"Home",href:"/"},
@@ -24,8 +25,10 @@ export default function RootLayout({
       <body
         className={`antialiased`}
       >
-        <Navbar navItems={navItems}/>
-        {children}
+        <AuthProvider>  
+          <Navbar navItems={navItems}/>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

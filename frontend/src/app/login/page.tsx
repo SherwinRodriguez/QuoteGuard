@@ -1,24 +1,37 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
 
-    // TODO: Replace with real API call later
-    if (email === 'admin@gmail.com' && password === 'admin123') {
-      localStorage.setItem('token', 'mock-token');
-      router.push('/dashboard');
-    } else {
-      alert('Invalid credentials');
+  const  {login}  = useAuth();
+  const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const res = await fetch('http://localhost:8080/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Invalid credentials');
     }
-  };
+
+    const token = await res.text(); // or .json() if your backend sends a token
+
+    // Save token if returned (right now just a string message)
+    login(token); // optional if not returning token
+  } catch (err) {
+    alert('❌ Login failed');
+    console.error(err);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">

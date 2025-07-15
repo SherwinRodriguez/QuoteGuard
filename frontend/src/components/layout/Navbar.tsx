@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Sidebar from './Sidebar';
+import { useAuth } from '@/context/AuthContext';
 
 interface NavbarProps {
   navItems: { name: string; href: string }[];
@@ -10,7 +11,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ navItems }) => {
   const [isOpen, setIsopen] = useState(false);
-  const [isLoggedIn] = useState(false); // Replace with real auth state later
+ const { isLoggedIn, logout } = useAuth();
 
   return (
     <nav className="fixed w-full z-50 bg-blue-500 backdrop-blur-md border border-white/20 shadow-xl p-5">
@@ -38,6 +39,16 @@ const Navbar: React.FC<NavbarProps> = ({ navItems }) => {
               )}
             </li>
           ))}
+          {isLoggedIn && (
+            <li>
+              <button
+                onClick={logout}
+                className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition"
+              >
+                Logout
+              </button>
+            </li>
+          )}
         </ul>
 
         {/* Mobile toggle */}
