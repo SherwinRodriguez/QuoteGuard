@@ -2,6 +2,8 @@ package com.quoteguard.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -19,8 +21,16 @@ public class Invoice {
     private String invoiceNumber;
     private LocalDate issueDate;
     private boolean paid;
-    private double totalAmount;
+    private BigDecimal totalAmount;
     private String qrToken;
+
+    @Column(nullable = false, updatable = false)
+    private LocalDate createdAt;
+
+    @PrePersist
+    public void setCreatedAt() {
+        this.createdAt = LocalDate.now();
+    }
 
     @ManyToOne
     @JoinColumn(name = "client_id")
