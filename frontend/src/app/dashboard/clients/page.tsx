@@ -1,6 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+<Link
+  href="/clients/new"
+  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+>
+  + New Client
+</Link>
 
 interface Client {
   id: number;
@@ -31,7 +39,18 @@ export default function ClientsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen px-6 py-8 bg-gray-100">
+    <div className="min-h-screen px-6 pt-28 pb-8 bg-gray-100">
+       <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-blue-800">Clients</h1>
+
+
+        <Link
+          href="/dashboard/clients/new"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+        >
+          + New Client
+        </Link>
+      </div>
       <h1 className="text-2xl font-bold text-blue-800 mb-6">Client List</h1>
 
       {loading ? (
@@ -50,6 +69,7 @@ export default function ClientsPage() {
           ))}
         </div>
       )}
+     
     </div>
   );
 }

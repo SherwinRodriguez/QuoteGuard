@@ -1,4 +1,3 @@
-// InvoiceResponse.java
 package com.quoteguard.dto;
 
 import lombok.AllArgsConstructor;
@@ -12,7 +11,7 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class InvoiceResponse {
+public class InvoiceDetailResponse {
     private Long id;
     private ClientResponse client;
     private BigDecimal totalAmount;

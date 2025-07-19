@@ -1,8 +1,6 @@
 package com.quoteguard.service;
 
-import com.quoteguard.dto.ClientResponse;
-import com.quoteguard.dto.InvoiceRequest;
-import com.quoteguard.dto.InvoiceResponse;
+import com.quoteguard.dto.*;
 import com.quoteguard.entity.Client;
 import com.quoteguard.entity.Invoice;
 import com.quoteguard.entity.InvoiceItems;
@@ -93,9 +91,41 @@ public class InvoiceService {
                                 invoice.getClient().getPhone()
                         ),
                         invoice.getTotalAmount(),
-                        invoice.getCreatedAt()
+                        invoice.getCreatedAt(),
+                        invoice.getItems().stream()
+                                .map(item -> new ItemResponse(
+                                        item.getProduct(),
+                                        item.getQuantity(),
+                                        BigDecimal.valueOf(item.getUnitPrice()) // or item.getUnitPrice() if already BigDecimal
+                                ))
+                                .collect(Collectors.toList())
                 ))
                 .collect(Collectors.toList());
+    }
+
+    public InvoiceDetailResponse getInvoiceById(Long id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        Client client = invoice.getClient();
+
+        return new InvoiceDetailResponse(
+                invoice.getId(),
+                new ClientResponse(
+                        client.getId(),
+                        client.getName(),
+                        client.getEmail(),
+                        client.getGstin(),
+                        client.getPhone()
+                ),
+                invoice.getTotalAmount(),
+                invoice.getCreatedAt(),
+                invoice.getItems().stream().map(item -> new ItemResponse(
+                        item.getProduct(),
+                        item.getQuantity(),
+                        BigDecimal.valueOf(item.getUnitPrice())
+                )).collect(Collectors.toList())
+        );
     }
 
 

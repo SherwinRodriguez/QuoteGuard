@@ -7,9 +7,9 @@ import Navbar from '@/components/layout/Navbar';
 
 const dashboardNavItems = [
   { name: 'Home', href: '/' },
-  { name: 'Clients', href: '/clients' },
-  { name: 'Invoices', href: '/invoices' },
-  { name: 'Profile', href: '/profile' },
+  { name: 'Clients', href: '/dashboard/clients'},
+  { name: 'Invoices', href: '/dashboard/invoices' },
+  { name: 'Profile', href: '/dashboard/profile' },
   { name: 'Settings', href: '/settings' },
 ];
 

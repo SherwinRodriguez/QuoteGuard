@@ -6,8 +6,8 @@ import { AuthProvider } from "@/context/AuthContext";
 const navItems =[
     {name:"Home",href:"/"},
     {name:"Dashboard",href:"/dashboard"},
-    {name:"Login",href:"/login"},
     {name:"Verify",href:"/verify"},
+    {name:"Login",href:"/login"}
 ]
 
 export const metadata: Metadata = {
