@@ -1,24 +1,23 @@
 package com.quoteguard.controller;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.List;
+
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import com.quoteguard.dto.InvoiceDetailResponse;
 import com.quoteguard.dto.InvoiceRequest;
 import com.quoteguard.dto.InvoiceResponse;
 import com.quoteguard.service.InvoiceService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-
-
-import java.util.List;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/invoices")
@@ -39,8 +38,8 @@ public class InvoiceController {
     }
 
     @GetMapping
-    public ResponseEntity<List<InvoiceResponse>> getAllInvoices() {
-        List<InvoiceResponse> invoices = invoiceService.getAllInvoices();
+    public ResponseEntity<List<InvoiceResponse>> getInvoicesByUser(@RequestParam Long userId) {
+        List<InvoiceResponse> invoices = invoiceService.getAllInvoicesByUser(userId);
         return ResponseEntity.ok(invoices);
     }
 
@@ -50,18 +49,35 @@ public class InvoiceController {
     }
 
     @GetMapping("/pdf/{invoiceId}")
-    public ResponseEntity<Resource> getInvoicePdf(@PathVariable Long invoiceId) throws IOException {
-        String pdfPath = "invoices/invoice-" + invoiceId + ".pdf";
-        File file = new File(pdfPath);
+    public ResponseEntity<Resource> downloadPdf(@PathVariable Long invoiceId) {
+        try {
+            String filePath = "generated/invoices/invoice-" + invoiceId + ".pdf";
+            File file = new File(filePath);
 
-        if (!file.exists()) {
-            return ResponseEntity.notFound().build();
+            if (!file.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+
+            InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(resource);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
 
-        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(resource);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteInvoice(@PathVariable Long id) {
+        try {
+            invoiceService.deleteInvoice(id);
+            return ResponseEntity.ok("Invoice deleted successfully.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 }

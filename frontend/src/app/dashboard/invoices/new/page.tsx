@@ -27,18 +27,21 @@ export default function NewInvoicePage() {
   const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        const res = await fetch('http://localhost:8080/api/clients');
-        const data = await res.json();
-        setClients(data);
-      } catch (err) {
-        console.error('Failed to fetch clients', err);
-      }
-    };
+  const fetchClients = async () => {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
 
-    fetchClients();
-  }, []);
+      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`);
+      const data = await res.json();
+      setClients(data);
+    } catch (err) {
+      console.error('Failed to fetch clients', err);
+    }
+  };
+
+  fetchClients();
+}, []);
 
   const handleAddItem = () => {
     if (!newItem.product || newItem.quantity <= 0 || newItem.unitPrice <= 0) return;
@@ -47,36 +50,46 @@ export default function NewInvoicePage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientId || !issueDate || items.length === 0) {
-      alert('Please fill all fields and add at least one item.');
-      return;
-    }
+  e.preventDefault();
 
-    const invoice = {
-      clientId: Number(clientId),
-      userId: 1, // static for now
-      issueDate,
-      paid,
-      totalAmount,
-      items,
-    };
+  if (!clientId || !issueDate || items.length === 0) {
+    alert('Please fill all fields and add at least one item.');
+    return;
+  }
 
-    try {
-      const res = await fetch('http://localhost:8080/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invoice),
-      });
+  const storedUserId = localStorage.getItem('userId');
+  if (!storedUserId) {
+    alert('❌ userId not found in localStorage');
+    return;
+  }
 
-      if (!res.ok) throw new Error('Invoice creation failed');
-      alert('✅ Invoice created successfully');
-      router.push('/dashboard/invoices');
-    } catch (err) {
-      console.error('❌ Error creating invoice:', err);
-      alert('Error creating invoice');
-    }
+  const invoice = {
+    clientId: Number(clientId),
+    userId: Number(storedUserId), // ✅ using stored userId here
+    issueDate,
+    paid,
+    totalAmount,
+    items,
   };
+
+  console.log('📤 Creating invoice with:', invoice); // ✅ debug log
+
+  try {
+    const res = await fetch('http://localhost:8080/api/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invoice),
+    });
+
+    if (!res.ok) throw new Error('Invoice creation failed');
+
+    alert('✅ Invoice created successfully');
+    router.push('/dashboard/invoices');
+  } catch (err) {
+    console.error('❌ Error creating invoice:', err);
+    alert('Error creating invoice');
+  }
+};
 
   return (
     <div className="min-h-screen pt-24 bg-gray-100 text-black px-6 py-8">

@@ -1,36 +1,43 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
-  const { isLoggedIn } = useAuth();
-  const router = useRouter();
+  const [clientsCount, setClientsCount] = useState(0);
+  const [invoicesCount, setInvoicesCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0); // Optional
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/dashboard/stats"); // backend endpoint
+      const data = await res.json();
+      setClientsCount(data.clients);
+      setInvoicesCount(data.invoices);
+      setPendingCount(data.pending);
+    } catch (err) {
+      console.error("Error fetching dashboard stats:", err);
+    }
+  };
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.push('/login');
-    }
-  }, [isLoggedIn,router]);
+    fetchStats();
+  }, []);
 
   return (
-    <div className="min-h-screen px-6 py-8 bg-gray-100">
-      <h1 className="text-3xl font-bold mb-6 text-blue-800">Welcome to QuoteGuard Dashboard</h1>
+    <div className="grid grid-cols-3 pt-24 gap-4 p-4">
+      <div className="bg-white rounded-2xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-700">Total Clients</h2>
+        <p className="text-2xl font-bold text-blue-600">{clientsCount}</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Total Clients</h2>
-          <p className="text-2xl font-bold text-blue-600">0</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Invoices Created</h2>
-          <p className="text-2xl font-bold text-green-600">0</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Pending Verifications</h2>
-          <p className="text-2xl font-bold text-red-600">0</p>
-        </div>
+      <div className="bg-white rounded-2xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-700">Invoices Created</h2>
+        <p className="text-2xl font-bold text-green-600">{invoicesCount}</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-700">Pending Verifications</h2>
+        <p className="text-2xl font-bold text-red-600">{pendingCount}</p>
       </div>
     </div>
   );

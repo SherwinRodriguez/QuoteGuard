@@ -1,50 +1,93 @@
 package com.quoteguard.utils;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Table;
-import com.itextpdf.layout.properties.UnitValue;
-import com.quoteguard.entity.Invoice;
-import com.quoteguard.entity.InvoiceItems;
-
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.util.List;
 
+import javax.imageio.ImageIO;
+
+import org.springframework.stereotype.Component;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.FontFactory;
+import com.itextpdf.text.Image;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import com.quoteguard.entity.Invoice;
+import com.quoteguard.entity.InvoiceItems;
+
+@Component
 public class PDFGenerator {
-    public static void generateInvoicePdf(Invoice invoice, String outputPath) throws Exception {
-        PdfWriter writer = new PdfWriter(new FileOutputStream(outputPath));
-        PdfDocument pdfDoc = new PdfDocument(writer);
-        Document doc = new Document(pdfDoc);
 
-        doc.add(new Paragraph("Invoice: " + invoice.getInvoiceNumber()).setBold().setFontSize(16));
-        doc.add(new Paragraph("Date: " + invoice.getIssueDate()));
-        doc.add(new Paragraph("Client: " + invoice.getClient().getName()));
-        doc.add(new Paragraph("GSTIN: " + invoice.getClient().getGstin()));
-        doc.add(new Paragraph(" "));
+    public void generateInvoicePdf(Invoice invoice, String filePath) throws Exception {
+        // Ensure the parent folders exist
+        java.io.File file = new java.io.File(filePath);
+        java.io.File parent = file.getParentFile();
+        if (!parent.exists() && !parent.mkdirs()) {
+            throw new Exception("Failed to create directory for PDF: " + parent.getAbsolutePath());
+        }
 
-        Table table = new Table(UnitValue.createPercentArray(new float[]{4, 2, 2, 2}))
-                .useAllAvailableWidth();
+        Document document = new Document();
+        PdfWriter.getInstance(document, new FileOutputStream(filePath));
+        document.open();
 
-        table.addHeaderCell("Product");
-        table.addHeaderCell("Quantity");
-        table.addHeaderCell("Unit Price");
-        table.addHeaderCell("Total");
+        // Fonts
+        Font bold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+        Font regular = FontFactory.getFont(FontFactory.HELVETICA, 12);
+
+        // Header
+        document.add(new Paragraph("Invoice", bold));
+        document.add(new Paragraph("Invoice Number: " + invoice.getInvoiceNumber(), regular));
+        document.add(new Paragraph("Client: " + invoice.getClient().getName(), regular));
+        document.add(new Paragraph("Email: " + invoice.getClient().getEmail(), regular));
+        document.add(new Paragraph("Issue Date: " + invoice.getIssueDate(), regular));
+        document.add(new Paragraph("Total Amount: ₹" + invoice.getTotalAmount(), regular));
+        document.add(new Paragraph(" "));
+
+        // Items Table
+        PdfPTable table = new PdfPTable(3);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(10f);
+
+        table.addCell("Product");
+        table.addCell("Quantity");
+        table.addCell("Unit Price");
 
         List<InvoiceItems> items = invoice.getItems();
         for (InvoiceItems item : items) {
             table.addCell(item.getProduct());
             table.addCell(String.valueOf(item.getQuantity()));
-            table.addCell(String.valueOf(item.getUnitPrice()));
-            table.addCell(String.valueOf(item.getLineTotal()));
+            table.addCell("₹" + item.getUnitPrice());
         }
 
-        doc.add(table);
+        document.add(table);
+        document.add(new Paragraph(" "));
 
-        doc.add(new Paragraph(" "));
-        doc.add(new Paragraph("Total Amount: ₹" + invoice.getTotalAmount()).setBold());
+        // Generate and embed QR Code
+        BufferedImage qrImage = generateQrCodeImage(invoice.getQrToken());
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(qrImage, "PNG", baos);
+        Image qr = Image.getInstance(baos.toByteArray());
+        qr.scaleToFit(100, 100);
+        qr.setAlignment(Element.ALIGN_RIGHT);
 
-        doc.close();
-}
+        document.add(new Paragraph("Scan to verify invoice:"));
+        document.add(qr);
+
+        document.close();
+    }
+
+    private BufferedImage generateQrCodeImage(String text) throws Exception {
+        QRCodeWriter writer = new QRCodeWriter();
+        BitMatrix matrix = writer.encode(text, BarcodeFormat.QR_CODE, 200, 200);
+        return MatrixToImageWriter.toBufferedImage(matrix);
+    }
 }

@@ -23,23 +23,32 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        const res = await fetch('http://localhost:8080/api/clients');
-        const data = await res.json();
-        setClients(data);
-      } catch (err) {
-        console.error('Error fetching clients', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchClients = async () => {
+    const userId = localStorage.getItem("userId");
 
-    fetchClients();
-  }, []);
+    if (!userId) {
+      console.error("User ID not found in localStorage");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch clients");
+      const data = await res.json();
+      setClients(data);
+    } catch (err) {
+      console.error("❌ Failed to fetch clients:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchClients();
+}, []);
 
   return (
-    <div className="min-h-screen px-6 pt-28 pb-8 bg-gray-100">
+    <div className="min-h-screen px-6 pt-28 pb-8 text-black bg-gray-100">
        <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-blue-800">Clients</h1>
 
@@ -65,6 +74,41 @@ export default function ClientsPage() {
               <p className="text-sm text-gray-600">{client.email}</p>
               <p className="text-sm text-gray-600">{client.phone}</p>
               <p className="text-sm text-gray-600">{client.gstin}</p>
+
+              <div className="mt-4 flex gap-4">
+                {/* Edit Button */}
+                <Link
+                  href={`/dashboard/clients/${client.id}/edit`}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Edit
+                </Link>
+
+                {/* Delete Button */}
+                <button
+                  className="text-sm text-red-600 hover:underline"
+                  onClick={async () => {
+                    const confirmDelete = confirm(`Are you sure you want to delete ${client.name}?`);
+                    if (!confirmDelete) return;
+
+                    try {
+                      const res = await fetch(`http://localhost:8080/api/clients/${client.id}`, {
+                        method: 'DELETE',
+                      });
+
+                      if (res.ok) {
+                        setClients(prev => prev.filter(c => c.id !== client.id));
+                      } else {
+                        console.error('Failed to delete client');
+                      }
+                    } catch (err) {
+                      console.error('Error deleting client', err);
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

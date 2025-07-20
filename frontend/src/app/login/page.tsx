@@ -23,13 +23,22 @@ export default function LoginPage() {
       throw new Error('Invalid credentials');
     }
 
-    const token = await res.text(); // or .json() if your backend sends a token
+    const data = await res.json();
+    console.log("🔐 Login response:", data); // 🧪 LOG response for debug
 
-    // Save token if returned (right now just a string message)
-    login(token); // optional if not returning token
+    const userId = data.userId;
+    if (userId) {
+      localStorage.setItem("userId", userId.toString());
+      console.log("📦 Saved userId in localStorage:", userId);
+    } else {
+      throw new Error("User ID not found in login response");
+    }
+
+    login(data.message); // optional if you use context
+    window.location.href = "/app/dashboard"; // ✅ redirect to dashboard
   } catch (err) {
-    alert('❌ Login failed');
-    console.error(err);
+    console.error("❌ Login error:", err);
+    alert("Login failed: " + (err as Error).message);
   }
 };
 

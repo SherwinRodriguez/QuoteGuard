@@ -16,25 +16,27 @@ export default function NewClientPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
-      const res = await fetch('http://localhost:8080/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
 
-      if (!res.ok) throw new Error('Failed to create client');
+  try {
+      const userId = localStorage.getItem("userId"); // must be stored at login
+      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+});
 
-      alert('✅ Client created');
-      router.push('/dashboard/clients');
-    } catch (err) {
-      alert('❌ Error creating client');
-      console.error(err);
-    }
-  };
+    if (!res.ok) throw new Error('Failed to create client');
+
+    alert('✅ Client created');
+    router.push('/dashboard/clients');
+  } catch (err) {
+    alert('❌ Error creating client');
+    console.error(err);
+  }
+};
 
   return (
     <div className="min-h-screen px-6 pt-28 pb-8 text-black bg-gray-100">
