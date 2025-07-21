@@ -5,11 +5,14 @@ import { useEffect, useState } from "react";
 export default function DashboardPage() {
   const [clientsCount, setClientsCount] = useState(0);
   const [invoicesCount, setInvoicesCount] = useState(0);
-  const [pendingCount, setPendingCount] = useState(0); // Optional
+  const [pendingCount, setPendingCount] = useState(0);
 
   const fetchStats = async () => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+
     try {
-      const res = await fetch("http://localhost:8080/api/dashboard/stats"); // backend endpoint
+      const res = await fetch(`http://localhost:8080/api/dashboard/stats?userId=${userId}`);
       const data = await res.json();
       setClientsCount(data.clients);
       setInvoicesCount(data.invoices);
