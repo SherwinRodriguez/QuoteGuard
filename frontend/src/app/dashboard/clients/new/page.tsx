@@ -22,7 +22,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   try {
       const userId = localStorage.getItem("userId"); // must be stored at login
-      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`, {
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients?userId=${userId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),

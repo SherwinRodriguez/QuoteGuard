@@ -28,7 +28,7 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/invoices/${id}`);
+        const res = await fetch(`https://quoteguard-backend.onrender.com/api/invoices/${id}`);
         const data = await res.json();
         setInvoice(data);
       } catch (err) {

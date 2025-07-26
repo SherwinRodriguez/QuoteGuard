@@ -32,7 +32,7 @@ export default function NewInvoicePage() {
       const userId = localStorage.getItem('userId');
       if (!userId) return;
 
-      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`);
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients?userId=${userId}`);
       const data = await res.json();
       setClients(data);
     } catch (err) {
@@ -75,7 +75,7 @@ export default function NewInvoicePage() {
   console.log('📤 Creating invoice with:', invoice); // ✅ debug log
 
   try {
-    const res = await fetch('http://localhost:8080/api/invoices', {
+    const res = await fetch('https://quoteguard-backend.onrender.com/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(invoice),

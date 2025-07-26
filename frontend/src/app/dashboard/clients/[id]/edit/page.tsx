@@ -20,7 +20,7 @@ export default function EditClientPage() {
   useEffect(() => {
     const fetchClient = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/clients/${params.id}`);
+        const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients/${params.id}`);
         const data = await res.json();
         setClient(data);
       } catch (error) {
@@ -37,7 +37,7 @@ export default function EditClientPage() {
     e.preventDefault();
 
     try {
-      const res = await fetch(`http://localhost:8080/api/clients/${params.id}`, {
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(client),

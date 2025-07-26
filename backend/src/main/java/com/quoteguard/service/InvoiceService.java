@@ -2,7 +2,9 @@ package com.quoteguard.service;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,15 +44,19 @@ public class InvoiceService {
                 .orElseThrow(() -> new RuntimeException("Client not found"));
 
         String generatedInvoiceNumber = "INV-" + System.currentTimeMillis();
+        String token = UUID.randomUUID().toString();
+        String qrToken = UUID.randomUUID().toString();
 
         Invoice invoice = Invoice.builder()
                 .invoiceNumber(generatedInvoiceNumber)
                 .issueDate(request.getIssueDate())
                 .paid(request.isPaid())
                 .totalAmount(BigDecimal.valueOf(request.getTotalAmount()))
-                .qrToken(UUID.randomUUID().toString())
                 .user(user)
+                .token(token)
+                .qrToken(qrToken)
                 .client(client)
+                .createdAt(LocalDate.now())
                 .build();
 
         List<InvoiceItems> items = request.getItems().stream().map(itemReq ->
@@ -68,17 +74,11 @@ public class InvoiceService {
 
         System.out.println("✅ Saved invoice for user: " + request.getUserId());
         System.out.println("✅ Invoice ID: " + savedInvoice.getId());
-        System.out.println("📌 Saved invoice user: " + savedInvoice.getUser());
-        System.out.println("📌 Saved invoice user ID: " + savedInvoice.getUser().getId());
 
         try {
             String pdfPath = "generated/invoices/invoice-" + savedInvoice.getId() + ".pdf";
-
             pdfGenerator.generateInvoicePdf(savedInvoice, pdfPath);
-
             System.out.println("✅ PDF generated at: " + pdfPath);
-            System.out.println("✅ Exists: " + new File(pdfPath).exists());
-            System.out.println("✅ PDF + QR successfully generated for invoice ID: " + savedInvoice.getId());
         } catch (Exception e) {
             System.out.println("❌ Failed to generate PDF or QR: " + e.getMessage());
             e.printStackTrace();
@@ -92,10 +92,6 @@ public class InvoiceService {
         List<Invoice> invoices = invoiceRepository.findByUser_Id(userId);
         System.out.println("📊 Invoices fetched: " + invoices.size());
 
-        for (Invoice invoice : invoices) {
-            System.out.println("🧾 Invoice ID: " + invoice.getId() + ", User ID: " + invoice.getUser().getId());
-        }
-
         return invoices.stream()
                 .map(invoice -> new InvoiceResponse(
                         invoice.getId(),
@@ -108,6 +104,7 @@ public class InvoiceService {
                         ),
                         invoice.getTotalAmount(),
                         invoice.getCreatedAt(),
+                        invoice.getQrToken(), // 👈 Added qrToken to response DTO
                         invoice.getItems().stream()
                                 .map(item -> new ItemResponse(
                                         item.getProduct(),
@@ -150,16 +147,51 @@ public class InvoiceService {
 
         invoiceRepository.delete(invoice);
 
-        String baseDir = System.getProperty("user.dir");
-        String pdfPath = baseDir + "/invoices/invoice-" + id + ".pdf";
+        String pdfPath = "generated/invoices/invoice-" + id + ".pdf";
         new File(pdfPath).delete();
     }
 
-    public String verifyInvoice(String qrToken) {
-        return invoiceRepository.findAll().stream()
-                .filter(i -> i.getQrToken().equals(qrToken))
-                .findFirst()
-                .map(invoice -> "✅ Invoice is valid for: " + invoice.getClient().getName())
-                .orElse("❌ Invalid or fake invoice");
+    // ✅ Token-based verification (copy from invoice page)
+    // InvoiceService.java
+    public String verifyInvoiceByToken(String token) {
+        Optional<Invoice> invoice = invoiceRepository.findByQrToken(token);
+        return invoice.isPresent()
+                ? "✅ Invoice is valid"
+                : "❌ Invalid or expired invoice token";
     }
+
+    public InvoiceResponse verifyAndFetchInvoice(String token) {
+        Invoice invoice = invoiceRepository.findByQrToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired token"));
+
+        return new InvoiceResponse(
+                invoice.getId(),
+                new ClientResponse(
+                        invoice.getClient().getId(),
+                        invoice.getClient().getName(),
+                        invoice.getClient().getEmail(),
+                        invoice.getClient().getGstin(),
+                        invoice.getClient().getPhone()
+                ),
+                invoice.getTotalAmount(),
+                invoice.getCreatedAt(),
+                invoice.getQrToken(),
+                invoice.getItems().stream().map(item ->
+                        new ItemResponse(
+                                item.getProduct(),
+                                item.getQuantity(),
+                                BigDecimal.valueOf(item.getUnitPrice())
+                        )
+                ).collect(Collectors.toList())
+        );
+    }
+
+    public void markAsPaid(Long id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        invoice.setPaid(true); // ✅ mark as paid
+        invoiceRepository.save(invoice); // 🔁 persist change
+    }
+
 }

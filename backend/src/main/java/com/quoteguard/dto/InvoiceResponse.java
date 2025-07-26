@@ -17,5 +17,6 @@ public class InvoiceResponse {
     private ClientResponse client;
     private BigDecimal totalAmount;
     private LocalDate createdAt;
+    private String qrToken;
     private List<ItemResponse> items;
 }

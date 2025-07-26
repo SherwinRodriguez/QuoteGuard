@@ -29,7 +29,7 @@ export default function ClientDetailsPage() {
   useEffect(() => {
     const fetchClient = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/clients/${id}`);
+        const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients/${id}`);
         if (!res.ok) throw new Error('Failed to fetch client');
         const data = await res.json();
         setClient(data);
@@ -50,7 +50,7 @@ export default function ClientDetailsPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:8080/api/clients/${id}`, {
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/clients/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

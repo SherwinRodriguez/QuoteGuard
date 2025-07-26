@@ -13,7 +13,7 @@ export default function LoginPage() {
   e.preventDefault();
 
   try {
-    const res = await fetch('http://localhost:8080/api/auth/login', {
+    const res = await fetch('https://quoteguard-backend.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -35,7 +35,7 @@ export default function LoginPage() {
     }
 
     login(data.message); // optional if you use context
-    window.location.href = "/app/dashboard"; // ✅ redirect to dashboard
+    window.location.href = "/dashboard"; // ✅ redirect to dashboard
   } catch (err) {
     console.error("❌ Login error:", err);
     alert("Login failed: " + (err as Error).message);

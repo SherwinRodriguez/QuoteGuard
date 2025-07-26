@@ -31,12 +31,15 @@ public class InvoiceController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/verify/{qrToken}")
-    public ResponseEntity<String> verifyInvoice(@PathVariable String qrToken) {
-        String result = invoiceService.verifyInvoice(qrToken);
-        return ResponseEntity.ok(result);
+    @GetMapping("/verify/{token}")
+    public ResponseEntity<?> verifyInvoice(@PathVariable String token) {
+        try {
+            InvoiceResponse response = invoiceService.verifyAndFetchInvoice(token);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ " + e.getMessage());
+        }
     }
-
     @GetMapping
     public ResponseEntity<List<InvoiceResponse>> getInvoicesByUser(@RequestParam Long userId) {
         List<InvoiceResponse> invoices = invoiceService.getAllInvoicesByUser(userId);
@@ -76,6 +79,16 @@ public class InvoiceController {
         try {
             invoiceService.deleteInvoice(id);
             return ResponseEntity.ok("Invoice deleted successfully.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PatchMapping("/{id}/mark-paid")
+    public ResponseEntity<String> markInvoiceAsPaid(@PathVariable Long id) {
+        try {
+            invoiceService.markAsPaid(id);
+            return ResponseEntity.ok("Invoice marked as paid");
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }

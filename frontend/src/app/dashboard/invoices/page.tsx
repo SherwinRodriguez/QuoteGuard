@@ -16,6 +16,8 @@ interface Invoice {
   client: Client;
   totalAmount: number;
   createdAt: string;
+  qrToken: string;
+  paid: boolean; // ✅ Make sure this is present
 }
 
 export default function InvoicesPage() {
@@ -23,24 +25,14 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Fetch invoices for the logged-in user
   const fetchInvoices = async () => {
     try {
-      // 🔥 HARDCODED USER ID (replace with localStorage.getItem later)
       const userId = localStorage.getItem('userId');
-      console.log("👤 Using hardcoded userId:", userId);
-
-      const res = await fetch(`http://localhost:8080/api/invoices?userId=${userId}`);
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText}`);
-      }
-
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/invoices?userId=${userId}`);
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      console.log("📦 Invoices received from backend:", data);
       setInvoices(data);
     } catch (error: any) {
-      console.error("❌ Failed to fetch invoices:", error);
       setError(error.message || "Unknown error");
     } finally {
       setLoading(false);
@@ -56,7 +48,7 @@ export default function InvoicesPage() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/invoices/${id}`, {
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/invoices/${id}`, {
         method: 'DELETE',
       });
 
@@ -64,11 +56,29 @@ export default function InvoicesPage() {
         setInvoices(invoices.filter(invoice => invoice.id !== id));
         alert('✅ Invoice deleted');
       } else {
-        const error = await res.text();
-        alert('❌ Delete failed: ' + error);
+        alert('❌ Delete failed: ' + (await res.text()));
       }
     } catch (err) {
       console.error('Delete failed', err);
+      alert('❌ Something went wrong.');
+    }
+  };
+
+  const handleMarkAsPaid = async (id: number) => {
+    try {
+      const res = await fetch(`https://quoteguard-backend.onrender.com/api/invoices/${id}/mark-paid`, {
+        method: 'PATCH',
+      });
+
+      if (res.ok) {
+        alert('✅ Invoice marked as paid');
+        fetchInvoices(); // refresh list
+      } else {
+        const err = await res.text();
+        alert('❌ Failed to mark as paid: ' + err);
+      }
+    } catch (err) {
+      console.error('❌ Mark paid error:', err);
       alert('❌ Something went wrong.');
     }
   };
@@ -101,6 +111,8 @@ export default function InvoicesPage() {
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Created At</th>
+                <th className="px-4 py-3">QR Token</th>
+                <th className="px-4 py-3">Paid</th>
                 <th className="px-4 py-3">Action</th>
               </tr>
             </thead>
@@ -112,21 +124,49 @@ export default function InvoicesPage() {
                   <td className="px-4 py-2">{invoice.client.email}</td>
                   <td className="px-4 py-2">₹{invoice.totalAmount}</td>
                   <td className="px-4 py-2">{invoice.createdAt}</td>
-                  <td className="px-4 py-2 flex gap-2">
-                    <button
-                      onClick={() => handleDelete(invoice.id)}
-                      className="text-red-600 hover:text-red-800 underline"
-                    >
-                      Delete
-                    </button>
+                  <td className="px-4 py-2 max-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      <code className="bg-gray-100 px-2 py-1 rounded font-mono text-xs truncate max-w-[150px]">
+                        {invoice.qrToken}
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(invoice.qrToken);
+                          alert("✅ Token copied");
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    {invoice.paid ? (
+                      <span className="text-green-600 font-semibold">Paid</span>
+                    ) : (
+                      <button
+                        onClick={() => handleMarkAsPaid(invoice.id)}
+                        className="text-blue-600 underline text-xs hover:text-blue-800"
+                      >
+                        Mark as Paid
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 flex flex-col gap-1 md:flex-row">
                     <a
-                      href={`http://localhost:8080/api/invoices/pdf/${invoice.id}`}
+                      href={`https://quoteguard-backend.onrender.com/api/invoices/pdf/${invoice.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline text-xs"
                     >
                       Download PDF
                     </a>
+                    <button
+                      onClick={() => handleDelete(invoice.id)}
+                      className="text-red-600 hover:text-red-800 underline text-xs"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

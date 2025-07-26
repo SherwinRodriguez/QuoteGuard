@@ -34,9 +34,17 @@ public class Invoice {
     private Long id;
     private String invoiceNumber;
     private LocalDate issueDate;
+
+    @Column(nullable = false)
     private boolean paid;
+
     private BigDecimal totalAmount;
+
+    @Column(nullable = false, unique = true)
     private String qrToken;
+
+    @Column(nullable = false, unique = true)
+    private String token;
 
     @Column(nullable = false, updatable = false)
     private LocalDate createdAt;
