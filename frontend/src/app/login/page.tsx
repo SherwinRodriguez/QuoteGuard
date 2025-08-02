@@ -1,11 +1,13 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const router = useRouter();
 
 
   const  {login}  = useAuth();
@@ -35,7 +37,7 @@ export default function LoginPage() {
     }
 
     login(data.message); // optional if you use context
-    window.location.href = "/app/dashboard"; // ✅ redirect to dashboard
+    router.push('/dashboard'); // ✅ redirect to dashboard
   } catch (err) {
     console.error("❌ Login error:", err);
     alert("Login failed: " + (err as Error).message);
