@@ -14,7 +14,7 @@ const Navbar: React.FC<NavbarProps> = ({ navItems }) => {
  const { isLoggedIn, logout } = useAuth();
 
   return (
-    <nav className="fixed w-full z-50 bg-blue-500 backdrop-blur-md border border-white/20 shadow-xl p-5">
+    <nav className="fixed w-full z-50 bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] backdrop-blur-md border border-white/20 shadow-xl p-5">
       <div className="flex justify-between w-full items-center">
         {/* Logo */}
         <h1 className="text-2xl font-extrabold bg-gradient-to-r from-red-500 via-pink-500 to-blue-800 text-transparent bg-clip-text">
