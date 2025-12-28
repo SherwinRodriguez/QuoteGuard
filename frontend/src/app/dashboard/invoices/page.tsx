@@ -2,46 +2,28 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-
-interface Client {
-  id: number;
-  name: string;
-  email: string;
-  gstin: string;
-  phone: string;
-}
-
-interface Invoice {
-  id: number;
-  client: Client;
-  totalAmount: number;
-  createdAt: string;
-}
+import { Invoice } from '@/types/invoice';
+import { invoiceService } from '@/services/invoice';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Fetch invoices for the logged-in user
   const fetchInvoices = async () => {
     try {
-      // 🔥 HARDCODED USER ID (replace with localStorage.getItem later)
       const userId = localStorage.getItem('userId');
-      console.log("👤 Using hardcoded userId:", userId);
-
-      const res = await fetch(`http://localhost:8080/api/invoices?userId=${userId}`);
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText}`);
+      if (!userId) {
+        setError('Please log in to view invoices');
+        setLoading(false);
+        return;
       }
 
-      const data = await res.json();
-      console.log("📦 Invoices received from backend:", data);
+      const data = await invoiceService.getInvoicesByUser(Number(userId));
       setInvoices(data);
     } catch (error: any) {
-      console.error("❌ Failed to fetch invoices:", error);
-      setError(error.message || "Unknown error");
+      console.error('❌ Failed to fetch invoices:', error);
+      setError(error.message || 'Failed to load invoices');
     } finally {
       setLoading(false);
     }
@@ -51,25 +33,35 @@ export default function InvoicesPage() {
     fetchInvoices();
   }, []);
 
-  const handleDelete = async (id: number) => {
-    const confirmed = window.confirm('Are you sure you want to delete this invoice?');
-    if (!confirmed) return;
+  const getStatusBadge = (status?: string) => {
+    if (status === 'REVOKED') {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+          REVOKED
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+        ACTIVE
+      </span>
+    );
+  };
 
+  const handleDownloadPDF = async (invoiceId: number) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/invoices/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        setInvoices(invoices.filter(invoice => invoice.id !== id));
-        alert('✅ Invoice deleted');
-      } else {
-        const error = await res.text();
-        alert('❌ Delete failed: ' + error);
-      }
+      const blob = await invoiceService.downloadPDF(invoiceId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err) {
-      console.error('Delete failed', err);
-      alert('❌ Something went wrong.');
+      console.error('Failed to download PDF:', err);
+      alert('❌ PDF not available yet. Please try again in a moment.');
     }
   };
 
@@ -86,18 +78,95 @@ export default function InvoicesPage() {
       </div>
 
       {loading ? (
-        <p>Loading invoices...</p>
+        <div className="flex justify-center items-center h-64">
+          <p className="text-gray-500">Loading invoices...</p>
+        </div>
       ) : error ? (
-        <p className="text-red-600">❌ {error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">❌ {error}</p>
+        </div>
       ) : invoices.length === 0 ? (
-        <p>No invoices found.</p>
+        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <p className="text-gray-500 mb-4">No invoices found.</p>
+          <Link
+            href="/dashboard/invoices/new"
+            className="text-blue-600 hover:underline"
+          >
+            Create your first invoice
+          </Link>
+        </div>
       ) : (
         <div className="overflow-x-auto bg-white rounded-xl shadow-md">
           <table className="min-w-full text-sm text-left">
             <thead className="bg-blue-100 text-blue-800">
               <tr>
-                <th className="px-4 py-3">#</th>
+                <th className="px-4 py-3">Invoice #</th>
                 <th className="px-4 py-3">Client</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Due Date</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {invoice.invoiceNumber || `#${invoice.id}`}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="font-medium">{invoice.client.name}</p>
+                      <p className="text-xs text-gray-500">{invoice.client.email}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {invoice.issueDate || new Date(invoice.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    {invoice.dueDate || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    {invoice.currency || 'INR'} {invoice.totalAmount.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {getStatusBadge(invoice.status)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2 justify-center">
+                      <Link
+                        href={`/dashboard/invoices/${invoice.id}`}
+                        className="text-blue-600 hover:underline text-xs"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => handleDownloadPDF(invoice.id)}
+                        className="text-green-600 hover:underline text-xs"
+                      >
+                        PDF
+                      </button>
+                      {invoice.uuid && (
+                        <Link
+                          href={`/verify?uuid=${invoice.uuid}`}
+                          target="_blank"
+                          className="text-purple-600 hover:underline text-xs"
+                        >
+                          Verify
+                        </Link>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Created At</th>
