@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Invoice } from '@/types/invoice';
 import { invoiceService } from '@/services/invoice';
+import { ApiError } from '@/lib/apiError';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -12,18 +13,13 @@ export default function InvoicesPage() {
 
   const fetchInvoices = async () => {
     try {
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        setError('Please log in to view invoices');
-        setLoading(false);
-        return;
-      }
-
-      const data = await invoiceService.getInvoicesByUser(Number(userId));
+      // The caller's identity comes from the JWT - apiClient attaches it automatically.
+      const data = await invoiceService.getInvoices();
       setInvoices(data);
-    } catch (error: any) {
-      console.error('❌ Failed to fetch invoices:', error);
-      setError(error.message || 'Failed to load invoices');
+    } catch (err) {
+      console.error('❌ Failed to fetch invoices:', err);
+      const message = err instanceof ApiError ? err.message : 'Failed to load invoices';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -157,45 +153,6 @@ export default function InvoicesPage() {
                         </Link>
                       )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Created At</th>
-                <th className="px-4 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice, index) => (
-                <tr key={invoice.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-2">{index + 1}</td>
-                  <td className="px-4 py-2">{invoice.client.name}</td>
-                  <td className="px-4 py-2">{invoice.client.email}</td>
-                  <td className="px-4 py-2">₹{invoice.totalAmount}</td>
-                  <td className="px-4 py-2">{invoice.createdAt}</td>
-                  <td className="px-4 py-2 flex gap-2">
-                    <button
-                      onClick={() => handleDelete(invoice.id)}
-                      className="text-red-600 hover:text-red-800 underline"
-                    >
-                      Delete
-                    </button>
-                    <a
-                      href={`http://localhost:8080/api/invoices/pdf/${invoice.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      Download PDF
-                    </a>
                   </td>
                 </tr>
               ))}

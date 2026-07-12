@@ -19,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -34,9 +35,18 @@ import lombok.Setter;
  * 3. Core fields (invoiceNumber, amounts, dates, items) are immutable
  * 4. Status can only transition from ACTIVE to REVOKED
  * 5. Invoices are NEVER deleted (audit trail requirement)
+ *
+ * The (user_id, invoice_number) unique constraint below closes a real race
+ * condition: InvoiceService.createInvoice checks uniqueness at the
+ * application level (existsByUserIdAndInvoiceNumber) before saving, but
+ * without a DB-level constraint two concurrent requests could both pass
+ * that check and both insert. GlobalExceptionHandler translates the
+ * resulting DataIntegrityViolationException into a clean 409 response.
  */
 @Entity
-@Table(name = "invoices")
+@Table(name = "invoices", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_invoice_user_number", columnNames = {"user_id", "invoice_number"})
+})
 @Getter
 @Setter
 @Builder

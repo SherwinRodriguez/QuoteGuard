@@ -2,56 +2,46 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-
-<Link
-  href="/clients/new"
-  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
->
-  + New Client
-</Link>
-
-interface Client {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  gstin: string;
-}
+import { clientService, Client } from '@/services/client';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  const fetchClients = async () => {
-    const userId = localStorage.getItem("userId");
+    const fetchClients = async () => {
+      try {
+        const data = await clientService.getClients();
+        setClients(data);
+      } catch (err) {
+        console.error('❌ Failed to fetch clients:', err);
+        setError('Failed to load clients');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (!userId) {
-      console.error("User ID not found in localStorage");
-      setLoading(false);
-      return;
-    }
+    fetchClients();
+  }, []);
+
+  const handleDelete = async (client: Client) => {
+    const confirmDelete = confirm(`Are you sure you want to delete ${client.name}?`);
+    if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`);
-      if (!res.ok) throw new Error("Failed to fetch clients");
-      const data = await res.json();
-      setClients(data);
+      await clientService.deleteClient(client.id);
+      setClients((prev) => prev.filter((c) => c.id !== client.id));
     } catch (err) {
-      console.error("❌ Failed to fetch clients:", err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to delete client', err);
+      alert('❌ Failed to delete client');
     }
   };
 
-  fetchClients();
-}, []);
-
   return (
     <div className="min-h-screen px-6 pt-28 pb-8 text-black bg-gray-100">
-       <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-blue-800">Clients</h1>
-
 
         <Link
           href="/dashboard/clients/new"
@@ -60,10 +50,13 @@ export default function ClientsPage() {
           + New Client
         </Link>
       </div>
-      <h1 className="text-2xl font-bold text-blue-800 mb-6">Client List</h1>
 
       {loading ? (
         <p>Loading clients...</p>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">❌ {error}</p>
+        </div>
       ) : clients.length === 0 ? (
         <p>No clients found.</p>
       ) : (
@@ -76,7 +69,6 @@ export default function ClientsPage() {
               <p className="text-sm text-gray-600">{client.gstin}</p>
 
               <div className="mt-4 flex gap-4">
-                {/* Edit Button */}
                 <Link
                   href={`/dashboard/clients/${client.id}/edit`}
                   className="text-sm text-blue-600 hover:underline"
@@ -84,27 +76,9 @@ export default function ClientsPage() {
                   Edit
                 </Link>
 
-                {/* Delete Button */}
                 <button
                   className="text-sm text-red-600 hover:underline"
-                  onClick={async () => {
-                    const confirmDelete = confirm(`Are you sure you want to delete ${client.name}?`);
-                    if (!confirmDelete) return;
-
-                    try {
-                      const res = await fetch(`http://localhost:8080/api/clients/${client.id}`, {
-                        method: 'DELETE',
-                      });
-
-                      if (res.ok) {
-                        setClients(prev => prev.filter(c => c.id !== client.id));
-                      } else {
-                        console.error('Failed to delete client');
-                      }
-                    } catch (err) {
-                      console.error('Error deleting client', err);
-                    }
-                  }}
+                  onClick={() => handleDelete(client)}
                 >
                   Delete
                 </button>
@@ -113,7 +87,6 @@ export default function ClientsPage() {
           ))}
         </div>
       )}
-     
     </div>
   );
 }

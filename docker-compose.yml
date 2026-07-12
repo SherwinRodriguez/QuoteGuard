@@ -1,0 +1,72 @@
+name: quoteguard
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-quoteguard}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - quoteguard_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-quoteguard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-quoteguard}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      # Required, no default: the prod profile has no fallback for this
+      # (see application-prod.properties) and Compose fails fast here with
+      # a clear message rather than letting the container crash-loop.
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in your .env file - see .env.example. Generate one with: openssl rand -base64 48}"
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-900000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+      APP_VERIFICATION_BASE_URL: ${APP_VERIFICATION_BASE_URL:-http://localhost:3000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    volumes:
+      # Durability for the local-disk PDF storage gap flagged in
+      # QUOTEGUARD_ARCHITECTURE.md Section 11.5 - this makes PDFs survive
+      # a container restart, but does NOT make them available if you ever
+      # scale to more than one backend instance (a shared object store
+      # would be required for that; out of scope here).
+      - quoteguard_invoices:/app/generated/invoices
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  quoteguard_pgdata:
+  quoteguard_invoices:

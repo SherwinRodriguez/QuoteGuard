@@ -2,14 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-
-interface Client {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  gstin: string;
-}
+import { clientService, Client } from '@/services/client';
+import { ApiError } from '@/lib/apiError';
 
 export default function ClientDetailsPage() {
   const { id } = useParams();
@@ -19,6 +13,8 @@ export default function ClientDetailsPage() {
 
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,18 +25,22 @@ export default function ClientDetailsPage() {
   useEffect(() => {
     const fetchClient = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/clients/${id}`);
-        if (!res.ok) throw new Error('Failed to fetch client');
-        const data = await res.json();
+        const data = await clientService.getClientById(Number(id));
         setClient(data);
-        setFormData(data);
+        setFormData({
+          name: data.name,
+          email: data.email,
+          phone: data.phone ?? '',
+          gstin: data.gstin ?? '',
+        });
       } catch (err) {
         console.error(err);
+        setError(err instanceof ApiError ? err.message : 'Failed to load client');
       } finally {
         setLoading(false);
       }
     };
-    fetchClient();
+    if (id) fetchClient();
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,22 +49,23 @@ export default function ClientDetailsPage() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/clients/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      if (!res.ok) throw new Error('Update failed');
+      const updated = await clientService.updateClient(Number(id), formData);
+      setClient(updated);
       alert('✅ Client updated');
-      router.push('/clients');
+      router.push(`/dashboard/clients/${id}`);
     } catch (err) {
       console.error(err);
-      alert('❌ Update failed');
+      const message = err instanceof ApiError ? err.message : 'Update failed';
+      alert(`❌ ${message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
   if (loading) return <p className="p-4">Loading client...</p>;
+  if (error) return <p className="p-4 text-red-500">{error}</p>;
   if (!client) return <p className="p-4 text-red-500">Client not found.</p>;
 
   return (
@@ -84,15 +85,16 @@ export default function ClientDetailsPage() {
                 value={formData[field as keyof typeof formData]}
                 onChange={handleChange}
                 className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
+                required={field === 'name' || field === 'email'}
               />
             </div>
           ))}
           <button
             type="submit"
-            className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+            disabled={saving}
+            className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
           >
-            Save Changes
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
       ) : (
@@ -102,7 +104,7 @@ export default function ClientDetailsPage() {
           <p><strong>Phone:</strong> {client.phone}</p>
           <p><strong>GSTIN:</strong> {client.gstin}</p>
           <button
-            onClick={() => router.push(`/clients/${id}?edit=true`)}
+            onClick={() => router.push(`/dashboard/clients/${id}?edit=true`)}
             className="mt-4 text-blue-600 hover:underline"
           >
             ✏️ Edit Client

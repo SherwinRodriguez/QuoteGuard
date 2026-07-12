@@ -3,12 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { invoiceService } from '@/services/invoice';
+import { clientService, Client } from '@/services/client';
 import { InvoiceItem, InvoiceRequest } from '@/types/invoice';
-
-interface Client {
-  id: number;
-  name: string;
-}
+import { ApiError } from '@/lib/apiError';
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -36,11 +33,7 @@ export default function NewInvoicePage() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) return;
-
-        const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`);
-        const data = await res.json();
+        const data = await clientService.getClients();
         setClients(data);
       } catch (err) {
         console.error('Failed to fetch clients', err);
@@ -77,17 +70,9 @@ export default function NewInvoicePage() {
       return;
     }
 
-    const storedUserId = localStorage.getItem('userId');
-    if (!storedUserId) {
-      alert('❌ Please log in to create an invoice');
-      router.push('/login');
-      return;
-    }
-
     const request: InvoiceRequest = {
       invoiceNumber: invoiceNumber || undefined, // Auto-generated if empty
       clientId: Number(clientId),
-      userId: Number(storedUserId),
       issueDate,
       dueDate,
       currency,
@@ -103,9 +88,10 @@ export default function NewInvoicePage() {
       await invoiceService.createInvoice(request);
       alert('✅ Invoice created successfully');
       router.push('/dashboard/invoices');
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Error creating invoice:', err);
-      alert(err.message || 'Error creating invoice');
+      const message = err instanceof ApiError ? err.message : 'Error creating invoice';
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -310,104 +296,6 @@ export default function NewInvoicePage() {
             {loading ? 'Creating...' : 'Create Invoice'}
           </button>
         </div>
-      </form>
-    </div>
-  );
-}
-          <input
-            type="date"
-            value={issueDate}
-            onChange={(e) => setIssueDate(e.target.value)}
-            className="border p-2 rounded-md"
-            required
-          />
-
-          {/* Client */}
-          <select
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="border p-2 rounded-md"
-            required
-          >
-            <option value="">Select Client</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Paid Checkbox */}
-        <label className="inline-flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={paid}
-            onChange={(e) => setPaid(e.target.checked)}
-            className="accent-blue-600"
-          />
-          Mark as Paid
-        </label>
-
-        {/* Add Items */}
-        <div>
-          <h2 className="font-semibold mb-2">Add Items</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <input
-              type="text"
-              placeholder="Product"
-              value={newItem.product}
-              onChange={(e) => setNewItem({ ...newItem, product: e.target.value })}
-              className="border p-2 rounded-md"
-            />
-            <input
-              type="number"
-              placeholder="Quantity"
-              value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })}
-              className="border p-2 rounded-md"
-            />
-            <input
-              type="number"
-              placeholder="Unit Price"
-              value={newItem.unitPrice}
-              onChange={(e) => setNewItem({ ...newItem, unitPrice: Number(e.target.value) })}
-              className="border p-2 rounded-md"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAddItem}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            + Add Item
-          </button>
-        </div>
-
-        {/* Items List */}
-        {items.length > 0 && (
-          <ul className="text-sm text-gray-700 space-y-1">
-            {items.map((item, idx) => (
-              <li key={idx}>
-                • {item.product} – {item.quantity} × ₹{item.unitPrice}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Total */}
-        <p className="font-semibold text-lg">
-          Total: ₹<span className="text-blue-600">{totalAmount}</span>
-        </p>
-
-        {/* Submit Button */}
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
-        >
-          Generate Invoice
-        </button>
       </form>
     </div>
   );

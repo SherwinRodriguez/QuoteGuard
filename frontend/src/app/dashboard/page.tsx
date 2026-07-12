@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { dashboardService } from "@/services/dashboard";
 
 export default function DashboardPage() {
   const [clientsCount, setClientsCount] = useState(0);
@@ -8,12 +9,8 @@ export default function DashboardPage() {
   const [pendingCount, setPendingCount] = useState(0);
 
   const fetchStats = async () => {
-    const userId = localStorage.getItem("userId");
-    if (!userId) return;
-
     try {
-      const res = await fetch(`http://localhost:8080/api/dashboard/stats?userId=${userId}`);
-      const data = await res.json();
+      const data = await dashboardService.getStats();
       setClientsCount(data.clients);
       setInvoicesCount(data.invoices);
       setPendingCount(data.pending);

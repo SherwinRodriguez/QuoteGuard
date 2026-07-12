@@ -1,32 +1,32 @@
 package com.quoteguard.controller;
 
-import com.quoteguard.repository.ClientRepository;
-import com.quoteguard.repository.InvoiceRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.quoteguard.service.DashboardService;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * Thin controller delegating to DashboardService. Previously this class
+ * queried ClientRepository/InvoiceRepository directly and duplicated
+ * DashboardService's getStats() logic line-for-line - DashboardService was
+ * never actually injected anywhere, making it dead code with a live
+ * duplicate sitting next to it. Consolidated to a single implementation.
+ */
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final ClientRepository clientRepository;
-    private final InvoiceRepository invoiceRepository;
+    private final DashboardService dashboardService;
 
     @GetMapping("/stats")
-    public Map<String, Long> getDashboardStats(@RequestParam Long userId) {
-        long clientCount = clientRepository.countByUserId(userId);
-        long invoiceCount = invoiceRepository.countByUserId(userId);
-        long pendingCount = invoiceRepository.countByUserIdAndPaidFalse(userId);
-
-        Map<String, Long> stats = new HashMap<>();
-        stats.put("clients", clientCount);
-        stats.put("invoices", invoiceCount);
-        stats.put("pending", pendingCount);
-
-        return stats;
+    public Map<String, Object> getDashboardStats(@AuthenticationPrincipal(expression = "id") Long userId) {
+        return dashboardService.getStats(userId);
     }
 }

@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { clientService } from '@/services/client';
+import { ApiError } from '@/lib/apiError';
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -19,21 +21,14 @@ export default function NewClientPage() {
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-
   try {
-      const userId = localStorage.getItem("userId"); // must be stored at login
-      const res = await fetch(`http://localhost:8080/api/clients?userId=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-});
-
-    if (!res.ok) throw new Error('Failed to create client');
-
+    // The owning user is resolved server-side from the JWT.
+    await clientService.createClient(formData);
     alert('✅ Client created');
     router.push('/dashboard/clients');
   } catch (err) {
-    alert('❌ Error creating client');
+    const message = err instanceof ApiError ? err.message : 'Error creating client';
+    alert(`❌ ${message}`);
     console.error(err);
   }
 };

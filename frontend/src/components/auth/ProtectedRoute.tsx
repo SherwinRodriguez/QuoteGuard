@@ -9,16 +9,20 @@ export default function ProtectedRoute({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    // Wait for the initial localStorage check to finish before deciding to
+    // redirect - otherwise every page refresh briefly renders isLoggedIn as
+    // false (its initial state) and bounces a genuinely logged-in user to
+    // /login for a frame.
+    if (!isLoading && !isLoggedIn) {
       router.replace('/login');
     }
-  }, [isLoggedIn, router]);
+  }, [isLoading, isLoggedIn, router]);
 
-  if (!isLoggedIn) return null;
+  if (isLoading || !isLoggedIn) return null;
 
   return <>{children}</>;
 }

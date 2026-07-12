@@ -3,6 +3,7 @@ package com.quoteguard.utils;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
+import java.math.RoundingMode;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -43,6 +44,23 @@ public class PDFGenerator {
 
     @Value("${app.verification.base-url:http://localhost:3000}")
     private String baseUrl;
+
+    // Configurable so it can be pointed at a different mount without a code
+    // change (see docker-compose.yml's quoteguard_invoices volume, which is
+    // mounted at the default path below). Previously this path prefix was a
+    // string literal duplicated in InvoiceController.downloadPdf(); the two
+    // copies had no compiler-enforced link and could silently drift.
+    @Value("${app.storage.pdf-dir:generated/invoices}")
+    private String pdfStorageDir;
+
+    /**
+     * Single source of truth for where a given invoice's PDF lives on disk.
+     * Used both when writing the file (createInvoice) and when serving it
+     * back (downloadPdf) so the two can never disagree.
+     */
+    public String buildPdfPath(Long invoiceId) {
+        return pdfStorageDir + "/invoice-" + invoiceId + ".pdf";
+    }
 
     public void generateInvoicePdf(Invoice invoice, String filePath) throws Exception {
         // Ensure the parent folders exist
@@ -100,8 +118,8 @@ public class PDFGenerator {
         for (InvoiceItems item : items) {
             table.addCell(item.getProduct());
             table.addCell(String.valueOf(item.getQuantity()));
-            table.addCell(invoice.getCurrency() + " " + String.format("%.2f", item.getUnitPrice()));
-            table.addCell(invoice.getCurrency() + " " + String.format("%.2f", item.getLineTotal()));
+            table.addCell(invoice.getCurrency() + " " + item.getUnitPrice().setScale(2, RoundingMode.HALF_UP).toPlainString());
+            table.addCell(invoice.getCurrency() + " " + item.getLineTotal().setScale(2, RoundingMode.HALF_UP).toPlainString());
         }
 
         document.add(table);
