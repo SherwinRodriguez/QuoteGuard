@@ -2,29 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-
-interface Client {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  gstin: string;
-}
+import { clientService, Client, ClientRequest } from '@/services/client';
+import { ApiError } from '@/lib/apiError';
 
 export default function EditClientPage() {
-  const params = useParams(); // ❌ don't wrap this with `use()`
+  const params = useParams();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchClient = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/clients/${params.id}`);
-        const data = await res.json();
+        const data = await clientService.getClientById(Number(params.id));
         setClient(data);
-      } catch (error) {
-        console.error('Failed to load client:', error);
+      } catch (err) {
+        console.error('Failed to load client:', err);
+        setError(err instanceof ApiError ? err.message : 'Failed to load client');
       } finally {
         setLoading(false);
       }
@@ -35,27 +31,35 @@ export default function EditClientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!client) return;
 
+    const request: ClientRequest = {
+      name: client.name,
+      email: client.email,
+      phone: client.phone,
+      gstin: client.gstin,
+    };
+
+    setSaving(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/clients/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(client),
-      });
-
-      if (!res.ok) throw new Error('Update failed');
+      await clientService.updateClient(Number(params.id), request);
       router.push('/dashboard/clients');
-    } catch (error) {
-      console.error('Error updating client:', error);
+    } catch (err) {
+      console.error('Error updating client:', err);
+      const message = err instanceof ApiError ? err.message : 'Update failed';
+      alert(`❌ ${message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setClient(prev => prev ? { ...prev, [name]: value } : null);
+    setClient((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
   if (loading) return <p>Loading...</p>;
+  if (error) return <p className="p-4 text-red-500">{error}</p>;
   if (!client) return <p>Client not found</p>;
 
   return (
@@ -67,6 +71,7 @@ export default function EditClientPage() {
           value={client.name}
           onChange={handleChange}
           placeholder="Name"
+          required
           className="w-full border px-4 py-2 rounded"
         />
         <input
@@ -74,27 +79,29 @@ export default function EditClientPage() {
           value={client.email}
           onChange={handleChange}
           placeholder="Email"
+          required
           className="w-full border px-4 py-2 rounded"
         />
         <input
           name="phone"
-          value={client.phone}
+          value={client.phone ?? ''}
           onChange={handleChange}
           placeholder="Phone"
           className="w-full border px-4 py-2 rounded"
         />
         <input
           name="gstin"
-          value={client.gstin}
+          value={client.gstin ?? ''}
           onChange={handleChange}
           placeholder="GSTIN"
           className="w-full border px-4 py-2 rounded"
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          disabled={saving}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
         >
-          Save Changes
+          {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
     </div>

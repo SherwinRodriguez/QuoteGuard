@@ -1,30 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { invoiceService } from '@/services/invoice';
+import { VerificationResponse } from '@/types/invoice';
+import { ApiError } from '@/lib/apiError';
 
 /**
  * Public Invoice Verification Page
- * 
+ *
  * This page is accessed by ANYONE who scans the QR code.
  * NO AUTHENTICATION required.
- * 
+ *
  * URL: /verify/{uuid} or /verify?uuid={uuid}
  */
-
-interface VerificationResponse {
-  status: 'VERIFIED' | 'REVOKED' | 'MODIFIED' | 'NOT_FOUND';
-  message: string;
-  freelancerName?: string;
-  invoiceNumber?: string;
-  issueDate?: string;
-  dueDate?: string;
-  currency?: string;
-  totalAmount?: number;
-  revokedAt?: string;
-  revokedReason?: string;
-  verificationTimestamp: string;
-}
 
 export default function VerifyInvoicePage() {
   const searchParams = useSearchParams();
@@ -35,16 +24,9 @@ export default function VerifyInvoicePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-verify if UUID in URL
-  useEffect(() => {
-    if (uuidFromUrl) {
-      handleVerify(uuidFromUrl);
-    }
-  }, [uuidFromUrl]);
-
-  const handleVerify = async (uuidToVerify?: string) => {
+  const handleVerify = useCallback(async (uuidToVerify?: string) => {
     const targetUuid = uuidToVerify || uuid;
-    
+
     if (!targetUuid.trim()) {
       setError('Please enter an invoice UUID');
       return;
@@ -55,21 +37,23 @@ export default function VerifyInvoicePage() {
     setError(null);
 
     try {
-      const res = await fetch(`http://localhost:8080/api/invoices/verify/${targetUuid}`);
-      
-      if (!res.ok) {
-        throw new Error('Verification failed');
-      }
-      
-      const data: VerificationResponse = await res.json();
+      const data = await invoiceService.verifyInvoice(targetUuid);
       setResult(data);
     } catch (err) {
       console.error('❌ Verification failed:', err);
-      setError('Unable to verify invoice. Please check the UUID and try again.');
+      const message = err instanceof ApiError ? err.message : 'Unable to verify invoice. Please check the UUID and try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [uuid]);
+
+  // Auto-verify if UUID in URL
+  useEffect(() => {
+    if (uuidFromUrl) {
+      handleVerify(uuidFromUrl);
+    }
+  }, [uuidFromUrl, handleVerify]);
 
   const getStatusColor = (status?: string) => {
     switch (status) {

@@ -1,6 +1,5 @@
 "use client";
 
-import About from "@/components/layout/About";
 import { ArrowRight, Shield, Star, Users, CheckCircle, Zap, Lock, TrendingUp, Play } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -209,8 +208,8 @@ export default function Page() {
             </div>
             
             <blockquote className="text-2xl text-gray-700 mb-8 italic leading-relaxed">
-              "Quote Guard has revolutionized how we manage our business quotes. 
-              The security features give us peace of mind, and the interface is incredibly intuitive."
+              &quot;Quote Guard has revolutionized how we manage our business quotes.
+              The security features give us peace of mind, and the interface is incredibly intuitive.&quot;
             </blockquote>
             
             <div className="flex items-center justify-center gap-4">
@@ -260,7 +259,6 @@ export default function Page() {
         </div>
       </div>
 
-      <About />
     </div>
   );
 }
