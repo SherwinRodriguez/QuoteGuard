@@ -31,7 +31,7 @@ import com.quoteguard.entity.InvoiceItems;
  * 
  * CRITICAL QR CODE RULE:
  * QR must contain ONLY the verification URL:
- * https://<domain>/verify/{invoice_uuid}
+ * https://<domain>/verify?uuid={invoice_uuid}
  * 
  * DO NOT encode:
  * - Invoice amounts
@@ -133,7 +133,7 @@ public class PDFGenerator {
         document.add(new Paragraph(" "));
 
         // QR Code Section
-        String verificationUrl = baseUrl + "/verify/" + invoice.getUuid();
+        String verificationUrl = baseUrl + "/verify?uuid=" + invoice.getUuid();
         BufferedImage qrImage = generateQrCodeImage(verificationUrl);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(qrImage, "PNG", baos);
@@ -152,7 +152,7 @@ public class PDFGenerator {
      * Generate QR code image from verification URL
      * 
      * CRITICAL: The text parameter MUST be the full verification URL:
-     * https://<domain>/verify/{uuid}
+     * https://<domain>/verify?uuid={uuid}
      */
     private BufferedImage generateQrCodeImage(String text) throws Exception {
         QRCodeWriter writer = new QRCodeWriter();
