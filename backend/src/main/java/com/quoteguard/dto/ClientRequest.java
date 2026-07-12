@@ -8,17 +8,23 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Slimmed to only what login needs - see RegisterRequest for why this DTO no longer carries a "name" field. */
+/**
+ * Request body for creating/updating a client. Replaces accepting the raw
+ * Client JPA entity as the request body (see ClientController Javadoc).
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginRequest {
+public class ClientRequest {
+
+    @NotBlank(message = "Name is required")
+    private String name;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be a valid address")
     private String email;
 
-    @NotBlank(message = "Password is required")
-    private String password;
+    private String gstin;
+    private String phone;
 }

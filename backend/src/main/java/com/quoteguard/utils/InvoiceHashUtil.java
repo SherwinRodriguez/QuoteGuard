@@ -1,9 +1,7 @@
 package com.quoteguard.utils;
 
-import com.quoteguard.entity.Invoice;
-import com.quoteguard.entity.InvoiceItems;
-import org.springframework.stereotype.Component;
-
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,104 +9,85 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.stereotype.Component;
+
+import com.quoteguard.entity.Invoice;
+import com.quoteguard.entity.InvoiceItems;
+
 /**
  * Utility class for generating deterministic SHA-256 hashes for invoices.
- * 
+ *
  * CRITICAL RULES:
  * 1. Hash is computed ONCE at invoice creation
  * 2. Hash uses IMMUTABLE fields only
  * 3. Line items are sorted deterministically before hashing
  * 4. Formatting changes must NOT affect hash
+ *
+ * Money is formatted via BigDecimal.setScale(2, HALF_UP).toPlainString(),
+ * not String.format("%.2f", ...). The previous String.format call used the
+ * JVM's default Locale, which is locale-sensitive (some locales render a
+ * decimal comma instead of a decimal point) - meaning the SAME invoice data
+ * could hash differently depending purely on the server's locale
+ * configuration, not on the invoice's actual content. toPlainString() is
+ * always locale-independent.
+ *
+ * NOTE: changing this formatting mechanism changes the canonical string
+ * for otherwise-identical invoices, which means it changes the resulting
+ * hash. That is safe today only because there is no production data yet.
+ * A live system would need a hashVersion field per invoice to dispatch to
+ * the correct historical algorithm - see QUOTEGUARD_ARCHITECTURE.md
+ * Section 10, a gap that remains open after this change.
  */
 @Component
 public class InvoiceHashUtil {
 
-    /**
-     * Generate SHA-256 hash for invoice verification.
-     * 
-     * Hash inputs (in order):
-     * - freelancer_id (user_id)
-     * - invoice_number
-     * - issue_date
-     * - due_date
-     * - currency
-     * - subtotal
-     * - tax
-     * - total_amount
-     * - normalized line items (sorted by product name)
-     */
     public String generateHash(Invoice invoice) {
         try {
-            // Build canonical string representation
             String canonical = buildCanonicalString(invoice);
-            
-            // Compute SHA-256
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(canonical.getBytes(StandardCharsets.UTF_8));
-            
-            // Convert to hex string
             return bytesToHex(hashBytes);
-            
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
     }
 
-    /**
-     * Build canonical string from invoice immutable fields.
-     * Line items are sorted alphabetically by product name for determinism.
-     */
     private String buildCanonicalString(Invoice invoice) {
         StringBuilder sb = new StringBuilder();
-        
-        // User ID (freelancer)
+
         sb.append("user_id:").append(invoice.getUser().getId()).append("|");
-        
-        // Invoice number
         sb.append("invoice_number:").append(invoice.getInvoiceNumber()).append("|");
-        
-        // Issue date (ISO format)
         sb.append("issue_date:").append(invoice.getIssueDate().toString()).append("|");
-        
-        // Due date (ISO format)
         sb.append("due_date:").append(invoice.getDueDate().toString()).append("|");
-        
-        // Currency
         sb.append("currency:").append(invoice.getCurrency()).append("|");
-        
-        // Subtotal (normalized to 2 decimal places)
-        sb.append("subtotal:").append(String.format("%.2f", invoice.getSubtotal())).append("|");
-        
-        // Tax (normalized to 2 decimal places)
-        sb.append("tax:").append(String.format("%.2f", invoice.getTax())).append("|");
-        
-        // Total amount (normalized to 2 decimal places)
-        sb.append("total_amount:").append(String.format("%.2f", invoice.getTotalAmount())).append("|");
-        
-        // Line items (sorted by product name for determinism)
+        sb.append("subtotal:").append(formatMoney(invoice.getSubtotal())).append("|");
+        sb.append("tax:").append(formatMoney(invoice.getTax())).append("|");
+        sb.append("total_amount:").append(formatMoney(invoice.getTotalAmount())).append("|");
+
         sb.append("items:[");
         List<InvoiceItems> sortedItems = invoice.getItems().stream()
                 .sorted(Comparator.comparing(InvoiceItems::getProduct))
                 .collect(Collectors.toList());
-        
+
         for (int i = 0; i < sortedItems.size(); i++) {
             InvoiceItems item = sortedItems.get(i);
             sb.append("{product:").append(item.getProduct())
               .append(",qty:").append(item.getQuantity())
-              .append(",price:").append(String.format("%.2f", item.getUnitPrice()))
+              .append(",price:").append(formatMoney(item.getUnitPrice()))
               .append("}");
             if (i < sortedItems.size() - 1) {
                 sb.append(",");
             }
         }
         sb.append("]");
-        
+
         return sb.toString();
     }
 
-    /**
-     * Convert byte array to hexadecimal string
-     */
+    private String formatMoney(BigDecimal value) {
+        return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
     private String bytesToHex(byte[] bytes) {
         StringBuilder hexString = new StringBuilder();
         for (byte b : bytes) {
@@ -122,9 +101,9 @@ public class InvoiceHashUtil {
     }
 
     /**
-     * Verify if invoice has been tampered with.
-     * Recomputes hash and compares with stored hash.
-     * 
+     * Verify if invoice has been tampered with. Recomputes the hash and
+     * compares with the stored hash.
+     *
      * @return true if hash matches (invoice is authentic), false if tampered
      */
     public boolean verifyHash(Invoice invoice) {

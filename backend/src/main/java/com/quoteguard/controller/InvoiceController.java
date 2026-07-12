@@ -2,6 +2,7 @@ package com.quoteguard.controller;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.List;
 
 import org.springframework.core.io.InputStreamResource;
@@ -10,29 +11,39 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.quoteguard.dto.InvoiceDetailResponse;
 import com.quoteguard.dto.InvoiceRequest;
 import com.quoteguard.dto.InvoiceResponse;
 import com.quoteguard.dto.RevokeInvoiceRequest;
 import com.quoteguard.dto.VerificationResponse;
 import com.quoteguard.service.InvoiceService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
  * Invoice Controller
- * 
- * AUTHENTICATED ENDPOINTS (Freelancers only):
- * - POST   /api/invoices              → Create invoice
- * - GET    /api/invoices              → List user's invoices
- * - GET    /api/invoices/{id}         → Get invoice details
- * - POST   /api/invoices/{uuid}/revoke → Revoke invoice
- * - GET    /api/invoices/pdf/{id}     → Download PDF
- * 
- * PUBLIC ENDPOINTS (No auth required):
- * - GET    /api/invoices/verify/{uuid} → Verify invoice authenticity
+ *
+ * AUTHENTICATED ENDPOINTS (ownership-checked, identity from JWT):
+ * - POST   /api/invoices              -> Create invoice
+ * - GET    /api/invoices              -> List caller's invoices
+ * - GET    /api/invoices/{id}         -> Get invoice details
+ * - POST   /api/invoices/{uuid}/revoke -> Revoke invoice
+ * - GET    /api/invoices/pdf/{id}     -> Download PDF
+ *
+ * PUBLIC ENDPOINT (no auth):
+ * - GET    /api/invoices/verify/{uuid} -> Verify invoice authenticity
+ *
+ * Error handling: exceptions thrown by InvoiceService (ResourceNotFoundException,
+ * DuplicateResourceException, AccessDeniedException, IllegalStateException,
+ * IllegalArgumentException) are handled centrally by GlobalExceptionHandler.
  */
 @RestController
 @RequestMapping("/api/invoices")
@@ -40,107 +51,77 @@ import lombok.RequiredArgsConstructor;
 public class InvoiceController {
     private final InvoiceService invoiceService;
 
-    /**
-     * Create a new invoice (AUTHENTICATED)
-     * 
-     * Invoice becomes IMMUTABLE after creation.
-     * A unique UUID is generated for verification.
-     */
     @PostMapping
-    public ResponseEntity<String> createInvoice(@RequestBody InvoiceRequest request) {
-        String response = invoiceService.createInvoice(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<String> createInvoice(
+            @Valid @RequestBody InvoiceRequest request,
+            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(invoiceService.createInvoice(request, currentUserId));
     }
 
     /**
-     * PUBLIC VERIFICATION ENDPOINT
-     * 
-     * Anyone can verify an invoice by UUID.
-     * NO AUTHENTICATION required.
-     * 
-     * Returns:
-     * - VERIFIED: Invoice is authentic and active
-     * - REVOKED: Invoice was revoked by issuer
-     * - MODIFIED: Invoice has been tampered with
-     * - NOT_FOUND: Invoice does not exist (possibly fake)
+     * PUBLIC VERIFICATION ENDPOINT - no authentication.
+     * Returns VERIFIED / REVOKED / MODIFIED / NOT_FOUND.
      */
     @GetMapping("/verify/{uuid}")
     public ResponseEntity<VerificationResponse> verifyInvoice(@PathVariable String uuid) {
-        VerificationResponse result = invoiceService.verifyInvoice(uuid);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(invoiceService.verifyInvoice(uuid));
     }
 
-    /**
-     * Get all invoices for authenticated user
-     */
     @GetMapping
-    public ResponseEntity<List<InvoiceResponse>> getInvoicesByUser(@RequestParam Long userId) {
-        List<InvoiceResponse> invoices = invoiceService.getAllInvoicesByUser(userId);
-        return ResponseEntity.ok(invoices);
+    public ResponseEntity<List<InvoiceResponse>> getInvoicesByUser(
+            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+        return ResponseEntity.ok(invoiceService.getAllInvoicesByUser(currentUserId));
     }
 
-    /**
-     * Get invoice details by internal ID (AUTHENTICATED)
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<InvoiceDetailResponse> getInvoiceById(@PathVariable Long id) {
-        return ResponseEntity.ok(invoiceService.getInvoiceById(id));
+    public ResponseEntity<InvoiceResponse> getInvoiceById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+        return ResponseEntity.ok(invoiceService.getInvoiceById(id, currentUserId));
     }
 
-    /**
-     * Revoke an invoice (AUTHENTICATED)
-     * 
-     * Rules:
-     * - Only owner can revoke
-     * - Status changes to REVOKED
-     * - Original data unchanged (audit trail)
-     * - Revoked invoices fail verification
-     */
     @PostMapping("/{uuid}/revoke")
     public ResponseEntity<String> revokeInvoice(
             @PathVariable String uuid,
-            @RequestParam Long userId,
-            @RequestBody RevokeInvoiceRequest request) {
-        try {
-            String response = invoiceService.revokeInvoice(uuid, userId, request);
-            return ResponseEntity.ok(response);
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+            @AuthenticationPrincipal(expression = "id") Long currentUserId,
+            @Valid @RequestBody RevokeInvoiceRequest request) {
+        return ResponseEntity.ok(invoiceService.revokeInvoice(uuid, currentUserId, request));
     }
 
     /**
-     * Download invoice PDF (AUTHENTICATED)
+     * Download invoice PDF (AUTHENTICATED, ownership-checked).
+     *
+     * assertOwnership is called before any file I/O and its exceptions are
+     * deliberately NOT caught here - they flow to GlobalExceptionHandler
+     * (404 for missing, 403 for not-yours). Only genuine file-I/O failures
+     * are handled locally, since those are specific to this endpoint.
      */
     @GetMapping("/pdf/{invoiceId}")
-    public ResponseEntity<Resource> downloadPdf(@PathVariable Long invoiceId) {
+    public ResponseEntity<Resource> downloadPdf(
+            @PathVariable Long invoiceId,
+            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+        invoiceService.assertOwnership(invoiceId, currentUserId);
+
+        String filePath = invoiceService.getPdfPath(invoiceId);
+        File file = new File(filePath);
+
+        if (!file.exists()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
         try {
-            String filePath = "generated/invoices/invoice-" + invoiceId + ".pdf";
-            File file = new File(filePath);
-
-            if (!file.exists()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-            }
-
             InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
-
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(resource);
-
-        } catch (Exception e) {
-            // Log error - in production use proper logging framework
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        } catch (FileNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 
     /**
-     * DELETE ENDPOINT REMOVED
-     * 
-     * Invoices must NEVER be deleted (audit trail requirement).
-     * Use POST /{uuid}/revoke instead.
+     * DELETE ENDPOINT REMOVED - Invoices must NEVER be deleted (audit trail
+     * requirement). Use POST /{uuid}/revoke instead.
      */
 }
