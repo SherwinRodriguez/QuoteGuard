@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { invoiceService } from '@/services/invoice';
 import { VerificationResponse } from '@/types/invoice';
@@ -15,7 +15,7 @@ import { ApiError } from '@/lib/apiError';
  * URL: /verify/{uuid} or /verify?uuid={uuid}
  */
 
-export default function VerifyInvoicePage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
   const uuidFromUrl = searchParams.get('uuid');
   
@@ -210,5 +210,13 @@ export default function VerifyInvoicePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyInvoicePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <VerifyContent />
+    </Suspense>
   );
 }
